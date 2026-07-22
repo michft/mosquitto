@@ -1,0 +1,30 @@
+# Environment files and local overrides
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Credentials and secrets
+config/password.txt
+config/passwd
+config/passwords.txt
+**/password.txt
+**/passwords.txt
+*.secret
+*.secrets
+*.credentials
+*.credential
+
+# Private keys, certificates, and keystores
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Local service state that can include credential material
+data/
+
+# Local logs may contain client details or published-topic metadata
+log/
