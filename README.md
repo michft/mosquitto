@@ -112,3 +112,10 @@ Explicitly requested rerun (starts/removes a separate test broker):
 Requires Apple Container, Mosquitto 2.0.22 image, existing broker only for hashing
 synthetic fixture passwords, and pinned Paho in worker environment. Uses port
 18884 and temporary fixtures; production credentials are never read.
+
+## Active deployment — 2026-10-08
+
+Broker subscriber/ACL, Frigate LAN endpoint/QoS 1, upload-enabled Mini worker and
+HA S3 viewer were deployed. Live retained QoS 1, conditional S3 PUT, HA viewer
+download/signed GET and media browsing passed; actual eligible video awaits face
+training. See [deployment and private rollback record](../homeassistant/MQTT-DEPLOYMENT-2026-10-08.md).
