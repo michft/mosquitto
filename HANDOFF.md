@@ -41,5 +41,7 @@ Requested implementation is now prepared: full ACL, bounded persistent queues
 and explicit provisioning helper; uploader and Frigate changes are coordinated
 in sibling repos. Review/merge the three PRs, run required isolated broker
 validation, then follow [operations guide](../homeassistant/MQTT-UPLOADER-OPERATIONS.md)
-for deployment. Actual accounts/config and automatic uploading remain unactivated. Repo has no remote; ask user for
-publishing destination only if publishing is requested.
+for deployment. Actual accounts/config and automatic uploading remain unactivated. Remote is `https://github.com/michft/mosquitto`. User requested replacement of
+remote `main` with latest local history on 2026-10-08; old tip is preserved at
+`pre-local-main-20261008`. Isolated broker verification passed; production
+deployment remains separate.

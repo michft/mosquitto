@@ -3,7 +3,10 @@
 Local colocated JJ/Git repo created 2026-10-08 for broker configuration and Apple
 Container operation. Public baseline copied from `/opt/mosquitto`; tracked config now prepares
 subscriber ACL and bounded offline queues. Live broker remains on original config. No credentials, old Git history or runtime state
-copied. No remote configured. This checkout is not deployed.
+copied. Remote: `https://github.com/michft/mosquitto`. On 2026-10-08 remote
+`main` was replaced with latest local history, including subscriber ACLs,
+provisioning, integration test and standing local-permission approval. Previous
+remote tip is preserved at `pre-local-main-20261008`. This checkout is not deployed.
 
 ## Entry points
 
@@ -89,3 +92,23 @@ Then prepare worker with `../homeassistant/bin/configure-person-uploader
 --mqtt-config ../mosquitto/private/uploader-mqtt.json`. Follow
 [operations guide](../homeassistant/MQTT-UPLOADER-OPERATIONS.md) for observe mode,
 activation, pause and rollback. No live broker account/config changed during PR work.
+
+## Isolated integration verification
+
+2026-10-08: explicitly approved Mosquitto 2.0.22 test passed with synthetic
+identities and localhost-only listener. Existing user/system-topic access, uploader
+write/unrelated-read denial, persisted offline QoS 1 delivery through broker
+restart, worker reconnect, failed-commit redelivery and duplicate merging passed.
+Temporary test container was stopped/deleted; production broker unchanged.
+
+Explicitly requested rerun (starts/removes a separate test broker):
+
+```sh
+../homeassistant/.venv/bin/python tests/integration-uploader.py \
+  --run-isolated-broker --broker-repo "$PWD" \
+  --worker ../homeassistant/upload-person-videos.py
+```
+
+Requires Apple Container, Mosquitto 2.0.22 image, existing broker only for hashing
+synthetic fixture passwords, and pinned Paho in worker environment. Uses port
+18884 and temporary fixtures; production credentials are never read.
