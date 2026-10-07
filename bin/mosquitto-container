@@ -1,0 +1,150 @@
+#!/bin/zsh
+
+set -eu
+
+repo_dir=${0:A:h:h}
+env_file=${MOSQUITTO_ENV_FILE:-"$repo_dir/.env.apple"}
+
+if [[ -f "$env_file" ]]; then
+  set -a
+  source "$env_file"
+  set +a
+fi
+
+container_bin=${CONTAINER_BIN:-container}
+container_name=${MOSQUITTO_CONTAINER_NAME:-mosquitto}
+image=${MOSQUITTO_IMAGE:-docker.io/library/eclipse-mosquitto:2.0.22}
+network=${MOSQUITTO_NETWORK:-default}
+bind_ip=${MOSQUITTO_BIND_IP:-192.168.1.106}
+config_volume=${MOSQUITTO_CONFIG_VOLUME:-mosquitto-config}
+data_volume=${MOSQUITTO_DATA_VOLUME:-mosquitto-data}
+log_volume=${MOSQUITTO_LOG_VOLUME:-mosquitto-log}
+stop_timeout=${MOSQUITTO_STOP_TIMEOUT:-30}
+
+die() {
+  print -u2 -- "error: $*"
+  exit 1
+}
+
+require_container() {
+  if command -v "$container_bin" >/dev/null 2>&1; then
+    return
+  fi
+
+  if [[ "$container_bin" == container && -x /opt/homebrew/bin/container ]]; then
+    container_bin=/opt/homebrew/bin/container
+    return
+  fi
+
+  die "Apple container CLI not found"
+}
+
+ensure_system() {
+  if ! "$container_bin" system status >/dev/null 2>&1; then
+    "$container_bin" system start --enable-kernel-install
+  fi
+}
+
+ensure_network() {
+  if ! "$container_bin" network list | awk 'NR > 1 { print $1 }' |
+      grep -Fqx "$network"; then
+    "$container_bin" network create "$network"
+  fi
+}
+
+ensure_volume() {
+  local volume=$1
+  if ! "$container_bin" volume list --quiet | grep -Fqx "$volume"; then
+    "$container_bin" volume create "$volume"
+  fi
+}
+
+container_exists() {
+  "$container_bin" list --all --quiet | grep -Fqx "$container_name"
+}
+
+container_running() {
+  "$container_bin" list --quiet | grep -Fqx "$container_name"
+}
+
+start_container() {
+  ensure_system
+  ensure_network
+  if ! "$container_bin" volume list --quiet | grep -Fqx "$config_volume"; then
+    die "config volume does not exist: $config_volume"
+  fi
+  ensure_volume "$data_volume"
+  ensure_volume "$log_volume"
+
+  if container_running; then
+    print -- "$container_name is already running"
+    return
+  fi
+
+  if container_exists; then
+    "$container_bin" start "$container_name"
+    return
+  fi
+
+  "$container_bin" run \
+    --detach \
+    --name "$container_name" \
+    --network "$network" \
+    --publish "$bind_ip:1883:1883" \
+    --cpus 1 \
+    --memory 256M \
+    --mount "type=volume,source=$config_volume,target=/mosquitto/config" \
+    --mount "type=volume,source=$data_volume,target=/mosquitto/data" \
+    --mount "type=volume,source=$log_volume,target=/mosquitto/log" \
+    "$image"
+}
+
+stop_container() {
+  ensure_system
+  container_exists || die "container does not exist: $container_name"
+  "$container_bin" stop --time "$stop_timeout" "$container_name"
+}
+
+recreate_container() {
+  ensure_system
+  if container_exists; then
+    "$container_bin" stop --time "$stop_timeout" "$container_name" \
+      >/dev/null 2>&1 || true
+    "$container_bin" delete "$container_name"
+  fi
+  start_container
+}
+
+usage() {
+  print -u2 -- "usage: ${0:t} {start|stop|restart|recreate|status|logs}"
+  exit 2
+}
+
+require_container
+
+case ${1:-} in
+  start)
+    start_container
+    ;;
+  stop)
+    stop_container
+    ;;
+  restart)
+    stop_container
+    start_container
+    ;;
+  recreate)
+    recreate_container
+    ;;
+  status)
+    ensure_system
+    "$container_bin" inspect "$container_name"
+    ;;
+  logs)
+    ensure_system
+    "$container_bin" logs "$container_name"
+    ;;
+  *)
+    usage
+    ;;
+esac

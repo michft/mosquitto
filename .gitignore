@@ -1,0 +1,22 @@
+# Authentication and private runtime data
+.env
+.env.*
+!.env.example
+password.txt
+password*
+passwd*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+secrets/
+*.db
+*.db-*
+data/
+log/
+logs/
+*.log
+__pycache__/
+*.py[cod]
+.DS_Store
