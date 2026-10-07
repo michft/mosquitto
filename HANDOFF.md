@@ -1,47 +1,48 @@
 # Handoff: broker support for Frigate video uploads
 
-Prepared 2026-10-08. Start at `/Users/mt/src/mosquitto`.
+Updated 2026-10-08 Australia/Sydney (2026-10-07 UTC). Start at
+`/Users/mt/src/mosquitto`.
 
 Read [AGENTS.md](AGENTS.md), [README.md](README.md), and canonical
-[MQTT uploader design/plans](../homeassistant/MQTT-UPLOADER-PLAN.md).
-Use caveman skill; use handoff skill when handing work onward. No subagents requested.
+[MQTT uploader design](../homeassistant/MQTT-UPLOADER-PLAN.md).
+Use caveman mode. No subagents requested.
 
-## Verified baseline
+## Current deployment
 
-Existing Mosquitto already serves Frigate. Public config copied into this repo
-matches inspected live config. Authentication required, broker persistence enabled;
-passwords/state/history excluded. Launcher and launchd template are snapshots;
-runtime remains `/opt/mosquitto` plus existing named volumes. No deployment done.
+Broker subscriber/ACL, bounded persistent queues, Frigate LAN endpoint/QoS 1,
+upload-enabled Mini worker and HA S3 viewer were deployed under explicit user
+authorization. Runtime remains the existing Apple Container services and named
+volumes; installed broker launcher remains `/opt/mosquitto`. Credentials and
+runtime state remain private, outside tracked files.
 
-Frigate source inspection confirmed person-event notifications and per-attempt
-face recognition metadata. Current publisher QoS 0 cannot be upgraded by merely
-subscribing at QoS 1. Frigate QoS 1 change must be prepared/reviewed in its repo.
-Certificate-based synthetic S3 upload/viewer downloads passed on 2026-10-07;
-MQTT upload service implementation is prepared; deployment, real eligible video
-and HA playback still pending.
+`person-s3-uploader` reads only `frigate/events`,
+`frigate/tracked_object_update` and `frigate/available`. Existing Frigate/HA
+application and system-topic permissions are preserved. Standing approval for
+future local permission expansions is recorded in AGENTS.md.
 
-## Next work here
+Live retained online delivery at QoS 1 passed after correcting Frigate's broker
+host to `192.168.1.106`. Conditional diagnostic S3 PUT, HA viewer exact-byte
+signed download and media browsing passed. Final route confirmation was
+2026-10-08 07:04 Australia/Sydney (2026-10-07 20:04 UTC).
 
-1. Inspect JJ state without snapshotting, verify secret ignores, check public config
-   drift. Do not open/copy password file or import `/opt/mosquitto` Git history.
-2. Inventory existing topic/user permissions privately. Prepare dedicated uploader
-   subscriber identity and read grants for `frigate/events`,
-   `frigate/tracked_object_update`, `frigate/available`. Current config has no ACL
-   file; preserve existing Frigate/HA access in any complete proposed ACL.
-3. Check persistent-session capacity/queue limits against actual traffic and
-   outage requirements. Keep publisher and broker recovery limitations explicit.
-4. Coordinate subscriber schemas and service with uploader in `../homeassistant`,
-   and publisher QoS/recognition training with `../frigate`. Persist attempts and
-   completed events; empty identity alone must never authorize an upload.
-5. Prepare reviewed deployment changes and private rollback, then arrange any
-   required broker/Frigate interruptions. Validate reconnects, duplicate handling,
-   recovery and real video viewing per canonical activation plan.
+Isolated Mosquitto 2.0.22 ACL/session/reconnect tests passed; temporary test
+container was removed. See [deployment and private rollback record](../homeassistant/MQTT-DEPLOYMENT-2026-10-08.md)
+for exact service/config paths and remaining real-event acceptance.
 
-Requested implementation is now prepared: full ACL, bounded persistent queues
-and explicit provisioning helper; uploader and Frigate changes are coordinated
-in sibling repos. Review/merge the three PRs, run required isolated broker
-validation, then follow [operations guide](../homeassistant/MQTT-UPLOADER-OPERATIONS.md)
-for deployment. Actual accounts/config and automatic uploading remain unactivated. Remote is `https://github.com/michft/mosquitto`. User requested replacement of
-remote `main` with latest local history on 2026-10-08; old tip is preserved at
-`pre-local-main-20261008`. Isolated broker verification passed; production
-deployment remains separate.
+## Remaining work and maintenance
+
+1. Inspect JJ state and verify secret ignores before snapshotting. Preserve
+   existing credentials, broker persistence, worker cutoff/queue/receipts and media.
+2. Train known faces in Frigate Face Library and observe actual recognition
+   attempts. Empty identity alone must never authorize upload. Verify one eligible
+   completed unknown-face video uploads and plays in HA; no-face/recognized events
+   stay excluded. At deployment there were 78 person events and zero face attempts.
+3. Monitor worker status, missed evidence and bounded broker queues. Coordinate
+   future publisher changes in `../frigate`, uploader/HA code in `../homeassistant`.
+4. Follow [operations](../homeassistant/MQTT-UPLOADER-OPERATIONS.md) for pause,
+   private rollback and future deployment. Subscriber is already provisioned;
+   provisioning helper refuses password rotation rather than replacing it.
+
+Remote: `https://github.com/michft/mosquitto`. User requested replacement of
+remote main with local history; old tip is preserved at `pre-local-main-20261008`.
+Review/merge documentation PRs separately from the already deployed runtime.
