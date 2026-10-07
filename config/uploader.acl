@@ -1,0 +1,14 @@
+# Preserve existing unrestricted access for the two installed MQTT identities.
+user homeassistant
+topic readwrite #
+topic readwrite $SYS/#
+
+user frigate
+topic readwrite #
+topic readwrite $SYS/#
+
+# New uploader consumes notifications; no publishing or unrelated subscriptions.
+user person-s3-uploader
+topic read frigate/events
+topic read frigate/tracked_object_update
+topic read frigate/available

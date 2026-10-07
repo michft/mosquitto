@@ -1,8 +1,8 @@
 # Mosquitto on Mini
 
 Local colocated JJ/Git repo created 2026-10-08 for broker configuration and Apple
-Container operation. Public baseline copied from `/opt/mosquitto`; config matches
-running broker at inspection. No credentials, old Git history or runtime state
+Container operation. Public baseline copied from `/opt/mosquitto`; tracked config now prepares
+subscriber ACL and bounded offline queues. Live broker remains on original config. No credentials, old Git history or runtime state
 copied. No remote configured. This checkout is not deployed.
 
 ## Entry points
@@ -39,11 +39,13 @@ Frigate currently uses topic prefix `frigate`, QoS 0. Planned host uploader read
 HA remains independent viewer. Worker needs dedicated subscriber identity,
 persistent session, commit-before-ack and local durable work queue. Proposed
 Frigate publisher QoS 1 belongs in Frigate repo; current broker persistence is
-already enabled. MQTT mode/service are not implemented yet.
+already enabled. MQTT mode/service are implemented in the uploader repo; deployment pending.
 
-Current broker has no ACL directive. Prepare a complete additive ACL preserving
-existing Frigate and HA access before adding read-only uploader grants. Never
-replace current access with only the new subscriber's topic list. Password files
+Live broker has no ACL directive. Tracked `config/uploader.acl` preserves full
+existing `homeassistant`/`frigate` access and grants `person-s3-uploader` read-only
+access to its three notification topics. `config/mosquitto.conf` installs that ACL
+and bounded persistent queues. Deploy through `bin/provision-uploader --apply`
+after review; script refuses unknown users/config drift. Password files
 remain private; AWS certificate keys belong to uploader/viewer, not broker config.
 
 ## Validation and deployment
@@ -67,3 +69,23 @@ private backup, install reviewed config into existing named volume, preserve own
 and permissions, arrange controlled broker reload/restart, verify Frigate/HA and
 uploader reconnections. Avoid copying older Docker compose or seed scripts into
 this Apple Container workflow. Broker outage affects all MQTT clients.
+
+## Subscriber provisioning
+
+`bin/provision-uploader` creates ignored `private/uploader-mqtt.json` (mode 600),
+with a generated password, without broker writes. Explicit `--apply` hashes the
+password using installed Mosquitto, preserves both existing users, backs up private
+files inside the config volume, atomically replaces prepared files and reloads
+broker. It refuses existing uploader/rotation, unexpected users, live config drift
+and symlink destinations. Do not display the generated JSON or passwords.
+
+```sh
+bin/provision-uploader
+# After reviewing complete ACL and coordinating deployment:
+bin/provision-uploader --apply
+```
+
+Then prepare worker with `../homeassistant/bin/configure-person-uploader
+--mqtt-config ../mosquitto/private/uploader-mqtt.json`. Follow
+[operations guide](../homeassistant/MQTT-UPLOADER-OPERATIONS.md) for observe mode,
+activation, pause and rollback. No live broker account/config changed during PR work.

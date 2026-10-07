@@ -1,0 +1,104 @@
+#!/opt/homebrew/bin/python3
+"""Prepare private MQTT credentials; --apply explicitly installs subscriber and broker config."""
+import argparse
+import json
+import os
+from pathlib import Path
+import secrets
+import subprocess
+import uuid
+
+ROOT = Path(__file__).resolve().parent.parent
+USER = 'person-s3-uploader'
+BASELINE = '''listener 1883
+protocol mqtt
+listener 9001
+protocol websockets
+persistence true
+persistence_location /mosquitto/data/
+log_dest file /mosquitto/log/mosquitto.log
+log_dest stdout
+allow_anonymous false
+password_file /mosquitto/config/password.txt'''
+
+
+def normalized(text):
+    return '\n'.join(s for line in text.splitlines() if (s := line.strip()) and not s.startswith('#'))
+
+
+def main():
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--container', default='mosquitto')
+    parser.add_argument('--mqtt-host', default='192.168.1.106')
+    parser.add_argument('--output', type=Path, default=ROOT / 'private/uploader-mqtt.json')
+    parser.add_argument('--apply', action='store_true')
+    args = parser.parse_args()
+    if args.output.is_symlink() or args.output.parent.is_symlink():
+        raise SystemExit('Private destination must not be a symlink')
+    args.output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if args.output.parent.stat().st_mode & 0o077:
+        raise SystemExit('Private output directory must have mode 700')
+    if args.output.exists():
+        if args.output.stat().st_mode & 0o077: raise SystemExit('Private MQTT file must have mode 600')
+        config = json.loads(args.output.read_text())
+        if config.get('username') != USER or not config.get('password'):
+            raise SystemExit('Existing private MQTT config does not match subscriber')
+    else:
+        config = dict(host=args.mqtt_host, port=1883, username=USER, password=secrets.token_urlsafe(32),
+                      client_id=USER, topic_prefix='frigate')
+        fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as stream: json.dump(config, stream, indent=2); stream.write('\n')
+    if args.apply:
+        def command(script, data=None):
+            result = subprocess.run(['/opt/homebrew/bin/container', 'exec', '--interactive', args.container,
+                                     'sh', '-eu', '-c', script], input=data, capture_output=True, text=True, timeout=30)
+            if result.returncode: raise RuntimeError('Broker provisioning step failed; private output suppressed')
+            return result.stdout
+        users = set(command("cut -d: -f1 /mosquitto/config/password.txt").splitlines())
+        if USER in users: raise SystemExit('Subscriber already exists; refusing password rotation')
+        if users != {'homeassistant', 'frigate'}:
+            raise SystemExit('Broker users changed; review complete ACL before applying')
+        live = command('cat /mosquitto/config/mosquitto.conf')
+        if normalized(live) != normalized(BASELINE):
+            raise SystemExit('Live broker config drifted; preserve/review it before applying')
+        # Hash a private one-line input with the exact installed Mosquitto utility.
+        # Password never appears in command arguments, stdout, or tracked files.
+        hashed = command('''umask 077
+p=$(mktemp /tmp/person-uploader.XXXXXX)
+trap 'rm -f "$p"' EXIT
+cat > "$p"
+mosquitto_passwd -U "$p"
+cat "$p"''', USER + ':' + config['password'] + '\n')
+        if not hashed.startswith(USER + ':$') or len(hashed.splitlines()) != 1:
+            raise SystemExit('Unexpected password utility response; suppressed')
+        tag = uuid.uuid4().hex
+        directory = '/mosquitto/config/.uploader-' + tag
+        command('umask 077; mkdir ' + directory)
+        command('cat > ' + directory + '/entry', hashed)
+        command('cat > ' + directory + '/acl.conf', (ROOT / 'config/uploader.acl').read_text())
+        command('cat > ' + directory + '/mosquitto.conf', (ROOT / 'config/mosquitto.conf').read_text())
+        command('''d=''' + directory + '''
+[ ! -L /mosquitto/config/password.txt ]
+[ ! -L /mosquitto/config/mosquitto.conf ]
+[ ! -e /mosquitto/config/acl.conf ]
+! grep -q '^person-s3-uploader:' /mosquitto/config/password.txt
+cp -p /mosquitto/config/password.txt "$d/password.before"
+cp -p /mosquitto/config/mosquitto.conf "$d/config.before"
+cat /mosquitto/config/password.txt "$d/entry" > "$d/password.next"
+chown 1883:1883 "$d/password.next" "$d/acl.conf" "$d/mosquitto.conf"
+chmod 600 "$d/password.next"
+chmod 640 "$d/acl.conf" "$d/mosquitto.conf"
+mv "$d/password.next" /mosquitto/config/password.txt
+mv "$d/acl.conf" /mosquitto/config/acl.conf
+mv "$d/mosquitto.conf" /mosquitto/config/mosquitto.conf
+rm "$d/entry"
+kill -HUP 1''')
+        print('Subscriber and ACL installed; broker reloaded. Private backup in volume: ' + directory)
+    else:
+        print('Credentials prepared only; broker untouched. Re-run with --apply for reviewed deployment.')
+    print('Private worker MQTT config: ' + str(args.output))
+
+
+if __name__ == '__main__':
+    main()

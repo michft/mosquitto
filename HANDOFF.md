@@ -17,7 +17,8 @@ Frigate source inspection confirmed person-event notifications and per-attempt
 face recognition metadata. Current publisher QoS 0 cannot be upgraded by merely
 subscribing at QoS 1. Frigate QoS 1 change must be prepared/reviewed in its repo.
 Certificate-based synthetic S3 upload/viewer downloads passed on 2026-10-07;
-actual MQTT upload service, real eligible video and HA playback still pending.
+MQTT upload service implementation is prepared; deployment, real eligible video
+and HA playback still pending.
 
 ## Next work here
 
@@ -36,7 +37,9 @@ actual MQTT upload service, real eligible video and HA playback still pending.
    required broker/Frigate interruptions. Validate reconnects, duplicate handling,
    recovery and real video viewing per canonical activation plan.
 
-Current request creates tracking repo and updates design, not broker accounts,
-ACL deployment or automatic uploading. Next agent should implement reviewed plan
-within whatever further scope user requests. Repo has no remote; ask user for
+Requested implementation is now prepared: full ACL, bounded persistent queues
+and explicit provisioning helper; uploader and Frigate changes are coordinated
+in sibling repos. Review/merge the three PRs, run required isolated broker
+validation, then follow [operations guide](../homeassistant/MQTT-UPLOADER-OPERATIONS.md)
+for deployment. Actual accounts/config and automatic uploading remain unactivated. Repo has no remote; ask user for
 publishing destination only if publishing is requested.
