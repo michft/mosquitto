@@ -2,8 +2,12 @@
 
 Local colocated JJ/Git repo created 2026-10-08 for broker configuration and Apple
 Container operation. Public baseline copied from `/opt/mosquitto`; tracked config now prepares
-subscriber ACL and bounded offline queues. Live broker remains on original config. No credentials, old Git history or runtime state
-copied. No remote configured. This checkout is not deployed.
+subscriber ACL and bounded offline queues, deployed to the existing broker.
+No credentials, old Git history or runtime state copied. Dates here use
+Australia/Sydney unless explicitly marked UTC. Remote: `https://github.com/michft/mosquitto`. On 2026-10-08 remote
+`main` was replaced with latest local history, including subscriber ACLs,
+provisioning, integration test and standing local-permission approval. Previous
+remote tip is preserved at `pre-local-main-20261008`. Public broker config/ACL were deployed; runtime launcher remains under `/opt/mosquitto`.
 
 ## Entry points
 
@@ -34,17 +38,18 @@ settings before network changes. Do not broaden access while adding the uploader
 
 ## MQTT uploader work
 
-Frigate currently uses topic prefix `frigate`, QoS 0. Planned host uploader reads
+Frigate uses topic prefix `frigate`, QoS 1 and broker endpoint `192.168.1.106`.
+Active host uploader reads
 `frigate/events`, `frigate/tracked_object_update`, `frigate/available` directly.
-HA remains independent viewer. Worker needs dedicated subscriber identity,
-persistent session, commit-before-ack and local durable work queue. Proposed
-Frigate publisher QoS 1 belongs in Frigate repo; current broker persistence is
-already enabled. MQTT mode/service are implemented in the uploader repo; deployment pending.
+HA remains independent viewer. Worker uses its dedicated subscriber identity,
+persistent session, commit-before-ack and durable local queue. Frigate publisher
+config belongs in the Frigate repo; broker persistence remains enabled.
+MQTT worker and HA viewer are active; real eligible-video acceptance awaits training.
 
-Live broker has no ACL directive. Tracked `config/uploader.acl` preserves full
+Live broker uses the deployed ACL. Tracked `config/uploader.acl` preserves full
 existing `homeassistant`/`frigate` access and grants `person-s3-uploader` read-only
 access to its three notification topics. `config/mosquitto.conf` installs that ACL
-and bounded persistent queues. Deploy through `bin/provision-uploader --apply`
+and bounded persistent queues. New installations use `bin/provision-uploader --apply`
 after review; script refuses unknown users/config drift. Password files
 remain private; AWS certificate keys belong to uploader/viewer, not broker config.
 
@@ -88,4 +93,33 @@ bin/provision-uploader --apply
 Then prepare worker with `../homeassistant/bin/configure-person-uploader
 --mqtt-config ../mosquitto/private/uploader-mqtt.json`. Follow
 [operations guide](../homeassistant/MQTT-UPLOADER-OPERATIONS.md) for observe mode,
-activation, pause and rollback. No live broker account/config changed during PR work.
+activation, pause and rollback. Broker account/config were deployed under explicit
+user authorization; existing uploader accounts are preserved instead of rotated.
+
+## Isolated integration verification
+
+2026-10-08: explicitly approved Mosquitto 2.0.22 test passed with synthetic
+identities and localhost-only listener. Existing user/system-topic access, uploader
+write/unrelated-read denial, persisted offline QoS 1 delivery through broker
+restart, worker reconnect, failed-commit redelivery and duplicate merging passed.
+Temporary test container was stopped/deleted; production broker unchanged.
+
+Explicitly requested rerun (starts/removes a separate test broker):
+
+```sh
+../homeassistant/.venv/bin/python tests/integration-uploader.py \
+  --run-isolated-broker --broker-repo "$PWD" \
+  --worker ../homeassistant/upload-person-videos.py
+```
+
+Requires Apple Container, Mosquitto 2.0.22 image, existing broker only for hashing
+synthetic fixture passwords, and pinned Paho in worker environment. Uses port
+18884 and temporary fixtures; production credentials are never read.
+
+## Active deployment — 2026-10-08 Australia/Sydney (2026-10-07 UTC)
+
+Broker subscriber/ACL, Frigate LAN endpoint/QoS 1, upload-enabled Mini worker and
+HA S3 viewer were deployed. Final broker-route confirmation was at
+2026-10-08 07:04 Australia/Sydney (2026-10-07 20:04 UTC). Live retained QoS 1, conditional S3 PUT, HA viewer
+download/signed GET and media browsing passed; actual eligible video awaits face
+training. See [deployment and private rollback record](../homeassistant/MQTT-DEPLOYMENT-2026-10-08.md).

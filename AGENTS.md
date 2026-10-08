@@ -8,8 +8,9 @@ Use caveman mode unless user requests normal mode. Keep edits narrow.
   before snapshotting. Check secret ignores first. Preserve user changes.
 - Separate unrelated tasks. Before handoff: meaningful `jj describe`, concise
   task bookmark, then `jj new`; verify clean working copy.
-- Never import `/opt/mosquitto` Git history or credentials. No remote configured;
-  publishing requires explicit user authorization and chosen destination.
+- Never import `/opt/mosquitto` Git history or credentials. Remote is
+  `https://github.com/michft/mosquitto`; publishing requires explicit user
+  authorization. Prior remote main is preserved at `pre-local-main-20261008`.
 
 ## Broker and credentials
 
